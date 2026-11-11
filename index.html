@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
+<title>WelSend Licences</title>
+<style>
+/* Outil d'atelier : une colonne étroite, trois étapes, un code à copier */
+:root{--bg:#f3f6f5;--card:#ffffff;--fg:#14211f;--muted:#5b6b68;--line:#d6e0dd;--accent:#0f766e;--accent-fg:#ffffff;--ok:#15803d;--bad:#b42318;--code:#eef3f2;
+--display:"Space Grotesk",system-ui,sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1514;--card:#16201f;--fg:#e6efed;--muted:#94a6a2;--line:#2a3836;--accent:#2dd4bf;--accent-fg:#06201d;--ok:#4ade80;--bad:#f87171;--code:#0b1110;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1514;--card:#16201f;--fg:#e6efed;--muted:#94a6a2;--line:#2a3836;--accent:#2dd4bf;--accent-fg:#06201d;--ok:#4ade80;--bad:#f87171;--code:#0b1110;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:520px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+h1{font-family:var(--display);font-size:26px;margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:10px}
+.step{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+label{font-weight:600;font-size:14px}
+input{width:100%;box-sizing:border-box;padding:12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-family:var(--mono)}
+input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{padding:14px;font-size:16px;font-weight:600;border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg);cursor:pointer;font-family:var(--body)}
+button.sec{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button:disabled{opacity:.5}
+.msg{font-weight:600;min-height:1.5em;margin:0}
+.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+.out{font-family:var(--mono);font-size:13px;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px;word-break:break-all;user-select:all;-webkit-user-select:all;min-height:3em}
+.note{font-size:13px;color:var(--muted);margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@600&family=JetBrains+Mono&display=swap">
+</head><body>
+<div class="wrap">
+  <h1>Licences WelSend</h1>
+  <p class="lead">Créez le code de licence d'un client à partir du code de son téléphone.</p>
+
+  <form class="card" id="unlockForm">
+    <span class="step">Étape 1 · Déverrouiller</span>
+    <label for="pass">Phrase secrète du vendeur</label>
+    <input id="pass" type="password" autocomplete="current-password" placeholder="xxxxx-xxxxx-xxxxx-xxxxx">
+    <button id="unlockBtn" type="submit">Déverrouiller</button>
+    <p class="msg" id="unlockMsg"></p>
+    <p class="note">La clé de signature est chiffrée dans cette page. Sans la phrase secrète, personne ne peut créer de licence.</p>
+  </form>
+
+  <form class="card" id="genForm">
+    <span class="step">Étape 2 · Créer la licence</span>
+    <label for="dev">Code du téléphone du client (WelSend → Plus → Licence)</label>
+    <input id="dev" placeholder="ABCD-EFGH" autocapitalize="characters" autocomplete="off" spellcheck="false">
+    <label for="exp">Valable jusqu'au</label>
+    <input id="exp" type="date">
+    <div class="row">
+      <button type="button" class="sec" data-m="1">+1 mois</button>
+      <button type="button" class="sec" data-m="6">+6 mois</button>
+      <button type="button" class="sec" data-m="12">+1 an</button>
+    </div>
+    <button id="genBtn" type="submit" disabled>Créer la licence</button>
+    <p class="msg" id="genMsg"></p>
+  </form>
+
+  <div class="card">
+    <span class="step">Étape 3 · Envoyer au client</span>
+    <div class="out" id="out">Le code de licence apparaîtra ici.</div>
+    <button id="copyBtn" type="button">Copier le code</button>
+    <p class="note">Le client colle ce code dans WelSend → Plus → Licence, puis touche « Activer ». Le code ne marche que sur son téléphone.</p>
+  </div>
+</div>
+<script>
+// ECDSA P-256 + SHA-256 en JavaScript pur (sans WebCrypto), k déterministe RFC 6979.
+const P = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffffn;
+const N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
+const A = P - 3n;
+const GX = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296n;
+const GY = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5n;
+function mod(a, m) { const r = a % m; return r >= 0n ? r : r + m; }
+function inv(a, m) { let [o, r] = [mod(a, m), m], [x, y] = [1n, 0n]; while (r) { const q = o / r; [o, r] = [r, o - q * r]; [x, y] = [y, x - q * y]; } return mod(x, m); }
+function add(p, q) {
+  if (!p) return q; if (!q) return p;
+  if (p[0] === q[0]) { if (mod(p[1] + q[1], P) === 0n) return null; return dbl(p); }
+  const l = mod((q[1] - p[1]) * inv(q[0] - p[0], P), P);
+  const x = mod(l * l - p[0] - q[0], P); return [x, mod(l * (p[0] - x) - p[1], P)];
+}
+function dbl(p) {
+  if (!p || p[1] === 0n) return null;
+  const l = mod((3n * p[0] * p[0] + A) * inv(2n * p[1], P), P);
+  const x = mod(l * l - 2n * p[0], P); return [x, mod(l * (p[0] - x) - p[1], P)];
+}
+function mul(k, p) { let r = null; while (k > 0n) { if (k & 1n) r = add(r, p); p = dbl(p); k >>= 1n; } return r; }
+const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function sha256(msg) {
+  const l = msg.length, bl = ((l + 9 + 63) >> 6) << 6, b = new Uint8Array(bl); b.set(msg); b[l] = 0x80;
+  const bits = l * 8; for (let i = 0; i < 8; i++) b[bl - 1 - i] = Math.floor(bits / Math.pow(2, 8 * i)) & 0xff;
+  const h = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const w = new Uint32Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < bl; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = (b[o+4*i] << 24) | (b[o+4*i+1] << 16) | (b[o+4*i+2] << 8) | b[o+4*i+3];
+    for (let i = 16; i < 64; i++) { const s0 = r(w[i-15],7) ^ r(w[i-15],18) ^ (w[i-15] >>> 3), s1 = r(w[i-2],17) ^ r(w[i-2],19) ^ (w[i-2] >>> 10); w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0; }
+    let [a, bb, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (hh + (r(e,6) ^ r(e,11) ^ r(e,25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const t2 = ((r(a,2) ^ r(a,13) ^ r(a,22)) + ((a & bb) ^ (a & c) ^ (bb & c))) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    h[0] += a; h[1] += bb; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+  }
+  const out = new Uint8Array(32); for (let i = 0; i < 8; i++) { out[4*i] = h[i] >>> 24; out[4*i+1] = h[i] >>> 16; out[4*i+2] = h[i] >>> 8; out[4*i+3] = h[i]; } return out;
+}
+function concat(...a) { const n = a.reduce((s, x) => s + x.length, 0), o = new Uint8Array(n); let p = 0; for (const x of a) { o.set(x, p); p += x.length; } return o; }
+function hmac(key, msg) {
+  const k = new Uint8Array(64); k.set(key.length > 64 ? sha256(key) : key);
+  return sha256(concat(k.map(x => x ^ 0x5c), sha256(concat(k.map(x => x ^ 0x36), msg))));
+}
+function toBig(b) { let x = 0n; for (const v of b) x = (x << 8n) | BigInt(v); return x; }
+function to32(x) { const o = new Uint8Array(32); for (let i = 31; i >= 0; i--) { o[i] = Number(x & 0xffn); x >>= 8n; } return o; }
+function b64uDecode(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); return Uint8Array.from(bin, c => c.charCodeAt(0)); }
+// Signature brute r||s (64 octets), comme WebCrypto
+function signP256(dB64u, msg) {
+  const d = toBig(b64uDecode(dB64u)), h = sha256(msg), z = mod(toBig(h), N);
+  const x = to32(d), h1 = to32(z);
+  let V = new Uint8Array(32).fill(1), Kk = new Uint8Array(32);
+  Kk = hmac(Kk, concat(V, [0], x, h1)); V = hmac(Kk, V);
+  Kk = hmac(Kk, concat(V, [1], x, h1)); V = hmac(Kk, V);
+  for (;;) {
+    V = hmac(Kk, V); const k = toBig(V);
+    if (k > 0n && k < N) {
+      const R = mul(k, [GX, GY]), r = mod(R[0], N);
+      if (r !== 0n) { const s = mod(inv(k, N) * (z + r * d), N); if (s !== 0n) return concat(to32(r), to32(s)); }
+    }
+    Kk = hmac(Kk, concat(V, [0])); V = hmac(Kk, V);
+  }
+}
+
+
+const VAULT = {"salt": "VneCZVUU4ubMO+ZuLk4T+A==", "iv": "HfMA43O0VoxWyWm4", "ct": "6+En0FxuHrRQtehvToM5R1uNDRR4HttflG2HcnnR0R6SiIiEoJXwSLGxIOjngBoPSq1uvJpDMXfAInw="};
+let D = null;
+const $ = id => document.getElementById(id);
+function say(el, t, ok){ el.textContent = t; el.className = 'msg ' + (ok ? 'ok' : 'bad'); }
+function b64(s){ return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function b64u(bytes){ let s=''; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function setDate(months){ const d=new Date(); d.setMonth(d.getMonth()+months); const p=n=>String(n).padStart(2,'0'); $('exp').value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+setDate(12);
+document.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => setDate(+b.dataset.m)));
+
+$('unlockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const m = $('unlockMsg');
+  if (!window.crypto || !crypto.subtle) { say(m, "Ce navigateur bloque le chiffrement. Ouvrez la page dans Safari ou Chrome.", false); return; }
+  $('unlockBtn').disabled = true; say(m, "Vérification…", true);
+  try {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode($('pass').value.trim()), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64(VAULT.salt), iterations:600000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+    D = new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(VAULT.iv)}, key, b64(VAULT.ct)));
+    $('pass').value = ''; $('genBtn').disabled = false;
+    say(m, "Déverrouillé. Vous pouvez créer des licences.", true);
+  } catch (err) {
+    D = null; say(m, "Phrase secrète incorrecte.", false);
+  } finally { $('unlockBtn').disabled = false; }
+});
+
+$('genForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const m = $('genMsg');
+  if (!D) { say(m, "Déverrouillez d'abord (étape 1).", false); return; }
+  let dev = $('dev').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (dev.length === 8) dev = dev.slice(0,4) + '-' + dev.slice(4);
+  const exp = $('exp').value.replace(/-/g,'');
+  if (!/^[A-Z2-7]{4}-[A-Z2-7]{4}$/.test(dev)) { say(m, "Code du téléphone invalide : 8 caractères, format ABCD-EFGH.", false); return; }
+  if (!/^\d{8}$/.test(exp)) { say(m, "Choisissez une date de fin.", false); return; }
+  try {
+    const payload = new TextEncoder().encode('WS1|' + dev + '|' + exp);
+    $('out').textContent = b64u(payload) + '.' + b64u(signP256(D, payload));
+    say(m, "Licence créée pour " + dev + " jusqu'au " + exp.slice(6) + "/" + exp.slice(4,6) + "/" + exp.slice(0,4) + ".", true);
+  } catch (err) { say(m, "Erreur : " + (err && err.message ? err.message : err), false); }
+});
+
+$('copyBtn').addEventListener('click', () => {
+  const t = $('out').textContent;
+  if (!t.includes('.')) { say($('genMsg'), "Créez d'abord une licence.", false); return; }
+  const sel = () => { const r = document.createRange(); r.selectNodeContents($('out')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => say($('genMsg'), "Code copié.", true), () => { sel(); say($('genMsg'), "Code sélectionné : appuyez sur Copier.", true); });
+  } else { sel(); say($('genMsg'), "Code sélectionné : appuyez sur Copier.", true); }
+});
+</script>
+</body></html>
